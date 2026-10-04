@@ -338,6 +338,7 @@ export function createApi(component: AnyApi) {
           llmModel: v.optional(v.string()),
           llmBaseUrl: v.optional(v.string()),
           embeddingApiKey: v.optional(v.string()),
+          embeddingBaseUrl: v.optional(v.string()),
           customExtractionPrompt: v.optional(v.string()),
           customUpdatePrompt: v.optional(v.string()),
         },
@@ -352,6 +353,7 @@ export function createApi(component: AnyApi) {
           projectId: v.string(),
           query: v.string(),
           embeddingApiKey: v.optional(v.string()),
+          embeddingBaseUrl: v.optional(v.string()),
           limit: v.optional(v.float64()),
         },
         returns: v.any(),
@@ -365,6 +367,7 @@ export function createApi(component: AnyApi) {
           memoryId: v.string(),
           embeddingApiKey: v.string(),
           model: v.optional(v.string()),
+          embeddingBaseUrl: v.optional(v.string()),
         },
         returns: v.null(),
         handler: async (ctx: any, args: any) => {
@@ -377,6 +380,7 @@ export function createApi(component: AnyApi) {
           projectId: v.string(),
           embeddingApiKey: v.string(),
           model: v.optional(v.string()),
+          embeddingBaseUrl: v.optional(v.string()),
         },
         returns: v.any(),
         handler: async (ctx: any, args: any) => {

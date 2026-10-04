@@ -42,12 +42,21 @@ const ingestEventValidator = v.union(
 
 // ── Embedding helper ────────────────────────────────────────────────
 
+const DEFAULT_EMBEDDING_BASE_URL = "https://api.openai.com/v1";
+
+// Works with any OpenAI-compatible provider (OpenAI, OpenRouter, ...).
+// Accepts the base URL with or without a trailing slash.
 async function fetchEmbedding(opts: {
   input: string;
   apiKey: string;
   model: string;
+  baseUrl?: string;
 }): Promise<number[]> {
-  const response = await fetch("https://api.openai.com/v1/embeddings", {
+  const baseUrl = (opts.baseUrl ?? DEFAULT_EMBEDDING_BASE_URL).replace(
+    /\/+$/,
+    "",
+  );
+  const response = await fetch(`${baseUrl}/embeddings`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${opts.apiKey}`,
@@ -77,6 +86,7 @@ export const generateEmbedding = action({
     memoryId: v.string(),
     embeddingApiKey: v.string(),
     model: v.optional(v.string()),
+    embeddingBaseUrl: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -91,6 +101,7 @@ export const generateEmbedding = action({
       input: `${memory.title}\n\n${memory.content}`,
       apiKey: args.embeddingApiKey,
       model,
+      baseUrl: args.embeddingBaseUrl,
     });
 
     await ctx.runMutation(internal.mutations.storeEmbedding, {
@@ -111,6 +122,7 @@ export const semanticSearch = action({
     projectId: v.string(),
     query: v.string(),
     embeddingApiKey: v.optional(v.string()),
+    embeddingBaseUrl: v.optional(v.string()),
     limit: v.optional(v.float64()),
   },
   returns: v.array(memoryDocValidator),
@@ -131,6 +143,7 @@ export const semanticSearch = action({
         input: args.query,
         apiKey: args.embeddingApiKey,
         model: "text-embedding-3-small",
+        baseUrl: args.embeddingBaseUrl,
       });
     } catch {
       return await ctx.runQuery(internal.queries.search, {
@@ -171,6 +184,7 @@ export const embedAll = action({
     projectId: v.string(),
     embeddingApiKey: v.string(),
     model: v.optional(v.string()),
+    embeddingBaseUrl: v.optional(v.string()),
   },
   returns: v.object({
     embedded: v.float64(),
@@ -190,6 +204,7 @@ export const embedAll = action({
           memoryId: memory._id,
           embeddingApiKey: args.embeddingApiKey,
           model: args.model,
+          embeddingBaseUrl: args.embeddingBaseUrl,
         });
         embedded++;
       } catch {
@@ -222,6 +237,7 @@ export const ingest = action({
     llmModel: v.optional(v.string()),
     llmBaseUrl: v.optional(v.string()),
     embeddingApiKey: v.optional(v.string()),
+    embeddingBaseUrl: v.optional(v.string()),
     customExtractionPrompt: v.optional(v.string()),
     customUpdatePrompt: v.optional(v.string()),
   },
@@ -319,6 +335,7 @@ export const ingest = action({
               await ctx.runAction(internal.actions.generateEmbedding, {
                 memoryId,
                 embeddingApiKey: args.embeddingApiKey,
+                embeddingBaseUrl: args.embeddingBaseUrl,
               });
             } catch {
               // Non-fatal: embedding generation failure shouldn't block ingest

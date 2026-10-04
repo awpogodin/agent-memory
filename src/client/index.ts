@@ -58,6 +58,8 @@ export interface AgentMemoryConfig {
   sessionId?: string;
   embeddingApiKey?: string;
   embeddingModel?: string;
+  /** OpenAI-compatible embeddings endpoint base. Defaults to "https://api.openai.com/v1". */
+  embeddingBaseUrl?: string;
   llmApiKey?: string;
   llmModel?: string;
   llmBaseUrl?: string;
@@ -419,6 +421,7 @@ export class AgentMemory {
       memoryId,
       embeddingApiKey: apiKey,
       model: this.config.embeddingModel,
+      embeddingBaseUrl: this.config.embeddingBaseUrl,
     });
   }
 
@@ -432,6 +435,7 @@ export class AgentMemory {
       projectId: this.config.projectId,
       embeddingApiKey: apiKey,
       model: this.config.embeddingModel,
+      embeddingBaseUrl: this.config.embeddingBaseUrl,
     });
   }
 
@@ -444,6 +448,7 @@ export class AgentMemory {
       projectId: this.config.projectId,
       query,
       embeddingApiKey: this.config.embeddingApiKey,
+      embeddingBaseUrl: this.config.embeddingBaseUrl,
       limit: opts?.limit,
     })) as Memory[];
   }
@@ -475,6 +480,7 @@ export class AgentMemory {
       llmModel: this.config.llmModel,
       llmBaseUrl: this.config.llmBaseUrl,
       embeddingApiKey: this.config.embeddingApiKey,
+      embeddingBaseUrl: this.config.embeddingBaseUrl,
       customExtractionPrompt: opts?.customExtractionPrompt,
       customUpdatePrompt: opts?.customUpdatePrompt,
     })) as IngestResult;
