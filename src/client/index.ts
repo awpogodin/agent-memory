@@ -448,6 +448,7 @@ export class AgentMemory {
       projectId: this.config.projectId,
       query,
       embeddingApiKey: this.config.embeddingApiKey,
+      model: this.config.embeddingModel,
       embeddingBaseUrl: this.config.embeddingBaseUrl,
       limit: opts?.limit,
     })) as Memory[];
@@ -480,6 +481,7 @@ export class AgentMemory {
       llmModel: this.config.llmModel,
       llmBaseUrl: this.config.llmBaseUrl,
       embeddingApiKey: this.config.embeddingApiKey,
+      embeddingModel: this.config.embeddingModel,
       embeddingBaseUrl: this.config.embeddingBaseUrl,
       customExtractionPrompt: opts?.customExtractionPrompt,
       customUpdatePrompt: opts?.customUpdatePrompt,

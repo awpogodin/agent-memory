@@ -42,7 +42,10 @@ const ingestEventValidator = v.union(
 
 // ── Embedding helper ────────────────────────────────────────────────
 
+const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 const DEFAULT_EMBEDDING_BASE_URL = "https://api.openai.com/v1";
+// Must match the `by_embedding` vector index in schema.ts.
+const EMBEDDING_DIMENSIONS = 1536;
 
 // Works with any OpenAI-compatible provider (OpenAI, OpenRouter, ...).
 // Accepts the base URL with or without a trailing slash.
@@ -79,6 +82,16 @@ async function fetchEmbedding(opts: {
   return data.data[0].embedding;
 }
 
+function assertEmbeddingDimensions(embedding: number[], model: string): void {
+  if (embedding.length !== EMBEDDING_DIMENSIONS) {
+    throw new Error(
+      `Embedding model "${model}" returned ${embedding.length} dimensions; ` +
+        `the index requires ${EMBEDDING_DIMENSIONS}. Use a ${EMBEDDING_DIMENSIONS}-dim model ` +
+        `(e.g. text-embedding-3-small / openai/text-embedding-3-small on OpenRouter).`,
+    );
+  }
+}
+
 // ── generateEmbedding ───────────────────────────────────────────────
 
 export const generateEmbedding = action({
@@ -90,7 +103,7 @@ export const generateEmbedding = action({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const model = args.model ?? "text-embedding-3-small";
+    const model = args.model ?? DEFAULT_EMBEDDING_MODEL;
 
     const memory = await ctx.runQuery(internal.queries.get, {
       memoryId: args.memoryId,
@@ -103,6 +116,7 @@ export const generateEmbedding = action({
       model,
       baseUrl: args.embeddingBaseUrl,
     });
+    assertEmbeddingDimensions(embedding, model);
 
     await ctx.runMutation(internal.mutations.storeEmbedding, {
       memoryId: args.memoryId,
@@ -122,12 +136,14 @@ export const semanticSearch = action({
     projectId: v.string(),
     query: v.string(),
     embeddingApiKey: v.optional(v.string()),
+    model: v.optional(v.string()),
     embeddingBaseUrl: v.optional(v.string()),
     limit: v.optional(v.float64()),
   },
   returns: v.array(memoryDocValidator),
   handler: async (ctx, args) => {
     const limit = args.limit ?? 10;
+    const model = args.model ?? DEFAULT_EMBEDDING_MODEL;
 
     if (!args.embeddingApiKey) {
       return await ctx.runQuery(internal.queries.search, {
@@ -142,7 +158,7 @@ export const semanticSearch = action({
       queryEmbedding = await fetchEmbedding({
         input: args.query,
         apiKey: args.embeddingApiKey,
-        model: "text-embedding-3-small",
+        model,
         baseUrl: args.embeddingBaseUrl,
       });
     } catch {
@@ -152,6 +168,9 @@ export const semanticSearch = action({
         limit,
       });
     }
+    // A dimension mismatch is a misconfiguration, not a transient API error:
+    // throw instead of silently falling back to full-text search.
+    assertEmbeddingDimensions(queryEmbedding, model);
 
     const vectorResults = await ctx.vectorSearch("embeddings", "by_embedding", {
       vector: queryEmbedding,
@@ -237,6 +256,7 @@ export const ingest = action({
     llmModel: v.optional(v.string()),
     llmBaseUrl: v.optional(v.string()),
     embeddingApiKey: v.optional(v.string()),
+    embeddingModel: v.optional(v.string()),
     embeddingBaseUrl: v.optional(v.string()),
     customExtractionPrompt: v.optional(v.string()),
     customUpdatePrompt: v.optional(v.string()),
@@ -335,6 +355,7 @@ export const ingest = action({
               await ctx.runAction(internal.actions.generateEmbedding, {
                 memoryId,
                 embeddingApiKey: args.embeddingApiKey,
+                model: args.embeddingModel,
                 embeddingBaseUrl: args.embeddingBaseUrl,
               });
             } catch {
@@ -360,6 +381,20 @@ export const ingest = action({
             memoryId: decision.existingMemoryId,
             content: decision.content,
           });
+
+          // Re-embed so vector search reflects the merged content
+          if (args.embeddingApiKey) {
+            try {
+              await ctx.runAction(internal.actions.generateEmbedding, {
+                memoryId: decision.existingMemoryId,
+                embeddingApiKey: args.embeddingApiKey,
+                model: args.embeddingModel,
+                embeddingBaseUrl: args.embeddingBaseUrl,
+              });
+            } catch {
+              // Non-fatal: embedding generation failure shouldn't block ingest
+            }
+          }
 
           results.push({
             memoryId: decision.existingMemoryId,
