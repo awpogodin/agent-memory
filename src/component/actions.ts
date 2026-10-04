@@ -40,6 +40,36 @@ const ingestEventValidator = v.union(
   v.literal("skipped"),
 );
 
+// ── Embedding helper ────────────────────────────────────────────────
+
+async function fetchEmbedding(opts: {
+  input: string;
+  apiKey: string;
+  model: string;
+}): Promise<number[]> {
+  const response = await fetch("https://api.openai.com/v1/embeddings", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${opts.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      input: opts.input,
+      model: opts.model,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Embedding API error: ${response.status} ${error}`);
+  }
+
+  const data = (await response.json()) as {
+    data: Array<{ embedding: number[] }>;
+  };
+  return data.data[0].embedding;
+}
+
 // ── generateEmbedding ───────────────────────────────────────────────
 
 export const generateEmbedding = action({
@@ -57,27 +87,11 @@ export const generateEmbedding = action({
     });
     if (!memory) throw new Error(`Memory not found: ${args.memoryId}`);
 
-    const response = await fetch("https://api.openai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${args.embeddingApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        input: `${memory.title}\n\n${memory.content}`,
-        model,
-      }),
+    const embedding = await fetchEmbedding({
+      input: `${memory.title}\n\n${memory.content}`,
+      apiKey: args.embeddingApiKey,
+      model,
     });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Embedding API error: ${response.status} ${error}`);
-    }
-
-    const data = (await response.json()) as {
-      data: Array<{ embedding: number[] }>;
-    };
-    const embedding = data.data[0].embedding;
 
     await ctx.runMutation(internal.mutations.storeEmbedding, {
       memoryId: args.memoryId,
@@ -111,30 +125,20 @@ export const semanticSearch = action({
       });
     }
 
-    const response = await fetch("https://api.openai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${args.embeddingApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    let queryEmbedding: number[];
+    try {
+      queryEmbedding = await fetchEmbedding({
         input: args.query,
+        apiKey: args.embeddingApiKey,
         model: "text-embedding-3-small",
-      }),
-    });
-
-    if (!response.ok) {
+      });
+    } catch {
       return await ctx.runQuery(internal.queries.search, {
         projectId: args.projectId,
         query: args.query,
         limit,
       });
     }
-
-    const data = (await response.json()) as {
-      data: Array<{ embedding: number[] }>;
-    };
-    const queryEmbedding = data.data[0].embedding;
 
     const vectorResults = await ctx.vectorSearch("embeddings", "by_embedding", {
       vector: queryEmbedding,
