@@ -153,4 +153,21 @@ describe("createApi", () => {
     expect(ctx.runQuery).not.toHaveBeenCalled();
     expect(ctx.runMutation).not.toHaveBeenCalled();
   });
+
+  // ── Provider options are exposed as optional args ───────────────
+
+  it.each([
+    ["ingest", ["llmModel", "llmBaseUrl", "embeddingModel", "embeddingBaseUrl"]],
+    ["semanticSearch", ["model", "embeddingBaseUrl"]],
+    ["generateEmbedding", ["model", "embeddingBaseUrl"]],
+    ["embedAll", ["model", "embeddingBaseUrl"]],
+  ] as const)("actions.%s accepts optional provider args", (name, fields) => {
+    const api = createApi(mockComponent() as any);
+    const args = (api.actions as any)[name].args;
+
+    for (const field of fields) {
+      expect(args[field], `${name}.${field}`).toBeDefined();
+      expect(args[field].isOptional, `${name}.${field}`).toBe("optional");
+    }
+  });
 });
