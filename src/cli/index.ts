@@ -276,6 +276,20 @@ program
   .option("--disable-tools <tools>", "Comma-separated list of tools to disable")
   .option("--embedding-api-key <key>", "API key for vector search")
   .option(
+    "--embedding-model <model>",
+    "Embedding model, must return 1536 dims (default: text-embedding-3-small)",
+  )
+  .option(
+    "--embedding-base-url <url>",
+    "OpenAI-compatible embeddings base URL (default: https://api.openai.com/v1)",
+  )
+  .option("--llm-api-key <key>", "API key for intelligent ingest")
+  .option("--llm-model <model>", "LLM model for ingest (default: gpt-4.1-nano)")
+  .option(
+    "--llm-base-url <url>",
+    "OpenAI-compatible LLM base URL (default: https://api.openai.com/v1)",
+  )
+  .option(
     "--module <name>",
     "Convex module that exports createApi functions (default: memory)",
   )
@@ -292,6 +306,11 @@ program
         ? opts.disableTools.split(",")
         : [],
       embeddingApiKey: opts.embeddingApiKey,
+      embeddingModel: opts.embeddingModel,
+      embeddingBaseUrl: opts.embeddingBaseUrl,
+      llmApiKey: opts.llmApiKey,
+      llmModel: opts.llmModel,
+      llmBaseUrl: opts.llmBaseUrl,
       module,
     });
   });

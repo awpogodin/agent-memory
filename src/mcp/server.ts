@@ -14,8 +14,13 @@ export interface McpServerConfig {
   readOnly: boolean;
   disabledTools: string[];
   embeddingApiKey?: string;
+  embeddingModel?: string;
+  /** OpenAI-compatible embeddings endpoint base. Defaults to "https://api.openai.com/v1". */
+  embeddingBaseUrl?: string;
   llmApiKey?: string;
   llmModel?: string;
+  /** OpenAI-compatible chat completions endpoint base. Defaults to "https://api.openai.com/v1". */
+  llmBaseUrl?: string;
   /** Convex module where createApi functions are exported. Defaults to "memory". */
   module?: string;
 }
@@ -331,6 +336,8 @@ export async function startMcpServer(config: McpServerConfig): Promise<void> {
                 projectId: config.projectId,
                 query: args!.query as string,
                 embeddingApiKey: config.embeddingApiKey,
+                model: config.embeddingModel,
+                embeddingBaseUrl: config.embeddingBaseUrl,
                 limit: (args!.limit as number) ?? 10,
               },
             );
@@ -552,7 +559,7 @@ export async function startMcpServer(config: McpServerConfig): Promise<void> {
               content: [
                 {
                   type: "text",
-                  text: "Ingest requires --llm-api-key flag. Pass an OpenAI-compatible API key to enable intelligent memory extraction.",
+                  text: "Ingest requires --llm-api-key flag. Pass an OpenAI-compatible API key to enable intelligent memory extraction (with --llm-base-url for non-OpenAI providers, e.g. https://openrouter.ai/api/v1).",
                 },
               ],
               isError: true,
@@ -567,7 +574,11 @@ export async function startMcpServer(config: McpServerConfig): Promise<void> {
               agentId: args?.agentId as string | undefined,
               sessionId: args?.sessionId as string | undefined,
               llmApiKey: config.llmApiKey,
+              llmModel: config.llmModel,
+              llmBaseUrl: config.llmBaseUrl,
               embeddingApiKey: config.embeddingApiKey,
+              embeddingModel: config.embeddingModel,
+              embeddingBaseUrl: config.embeddingBaseUrl,
             },
           );
           const summary = result.results
