@@ -121,6 +121,22 @@ const result = await memory.ingest(ctx, rawConversationText);
 // result.results: [{ event: "added"|"updated"|"deleted"|"skipped", content, memoryId }]
 ```
 
+Any OpenAI-compatible provider works for both the LLM and embeddings via `llmBaseUrl` / `embeddingBaseUrl` (e.g. OpenRouter):
+
+```typescript
+const memory = new AgentMemory(components.agentMemory, {
+  projectId: "my-app",
+  llmApiKey: process.env.OPENROUTER_API_KEY,
+  llmBaseUrl: "https://openrouter.ai/api/v1",
+  llmModel: "openai/gpt-4.1-nano",
+  embeddingApiKey: process.env.OPENROUTER_API_KEY,
+  embeddingBaseUrl: "https://openrouter.ai/api/v1",
+  embeddingModel: "openai/text-embedding-3-small", // must return 1536 dims
+});
+```
+
+MCP equivalents: `--llm-base-url`, `--llm-model`, `--embedding-base-url`, `--embedding-model`.
+
 ### 5. Feedback Loop
 
 Rate memories to influence priority scoring in future context bundles:

@@ -68,8 +68,11 @@ export const ingest = action(api.actions.ingest);
 - agentId (string) — agent identifier
 - sessionId (string) — session/conversation ID
 - embeddingApiKey (string) — enables vector search
+- embeddingModel (string) — default "text-embedding-3-small"; must return 1536 dims
+- embeddingBaseUrl (string) — OpenAI-compatible embeddings endpoint, default "https://api.openai.com/v1" (e.g. "https://openrouter.ai/api/v1")
 - llmApiKey (string) — enables intelligent ingest
 - llmModel (string) — default "gpt-4.1-nano"
+- llmBaseUrl (string) — OpenAI-compatible LLM endpoint, default "https://api.openai.com/v1"
 
 ## Key Methods
 
@@ -94,8 +97,9 @@ Write (mutation context):
 - recordAccess(ctx, ids) — track access for relevance decay
 
 Action context:
-- embed(ctx, memoryId) — generate vector embedding
-- semanticSearch(ctx, query) — vector similarity search
+- embed(ctx, memoryId) — generate (or overwrite) vector embedding
+- embedAll(ctx) — embed all memories that have no embedding yet
+- semanticSearch(ctx, query) — vector similarity search (query embedded with the same embeddingModel/embeddingBaseUrl)
 - ingest(ctx, content, opts?) — intelligent fact extraction + dedup via LLM
 
 API key management:
@@ -128,6 +132,8 @@ GET /list, /get?id=, /search?q=, /context, /export?format=, /history?id=, /relat
 ## CLI Commands
 
 agent-memory init, push, pull, list, search, mcp
+
+mcp flags: --embedding-api-key, --embedding-model, --embedding-base-url, --llm-api-key, --llm-model, --llm-base-url (base URLs accept any OpenAI-compatible provider, e.g. OpenRouter)
 
 All commands accept --module <name> (or AGENT_MEMORY_MODULE env var) to specify the Convex module where createApi functions are exported. Default: "memory".
 

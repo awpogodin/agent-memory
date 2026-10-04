@@ -211,10 +211,11 @@ const memory = new AgentMemory(components.agentMemory, {
   agentId: "claude-code",          // optional: agent identifier
   sessionId: "session-abc",        // optional: session/conversation ID
   embeddingApiKey: "sk-...",       // optional: enables vector search
-  embeddingModel: "text-embedding-3-small", // optional
+  embeddingModel: "text-embedding-3-small", // optional: must return 1536 dims
+  embeddingBaseUrl: "https://api.openai.com/v1", // optional: OpenAI-compatible embeddings endpoint
   llmApiKey: "sk-...",             // optional: enables intelligent ingest
   llmModel: "gpt-4.1-nano",       // optional: LLM for fact extraction
-  llmBaseUrl: "https://api.openai.com/v1", // optional: custom LLM endpoint
+  llmBaseUrl: "https://api.openai.com/v1", // optional: OpenAI-compatible LLM endpoint
 });
 ```
 
@@ -360,6 +361,38 @@ const result = await memory.ingest(ctx,
 //   { event: "deleted", content: "REST API conventions", memoryId: "...", previousContent: "..." },
 // ]
 ```
+
+When `embeddingApiKey` is set, added and updated memories are embedded with the configured `embeddingModel` and `embeddingBaseUrl`.
+
+### OpenAI-compatible providers
+
+`llmBaseUrl` accepts any OpenAI-compatible `/chat/completions` endpoint, such as [OpenRouter](https://openrouter.ai):
+
+```typescript
+const memory = new AgentMemory(components.agentMemory, {
+  projectId: "my-app",
+  llmApiKey: process.env.OPENROUTER_API_KEY,
+  llmBaseUrl: "https://openrouter.ai/api/v1",
+  llmModel: "openai/gpt-4.1-nano",
+  embeddingApiKey: process.env.OPENROUTER_API_KEY,
+  embeddingBaseUrl: "https://openrouter.ai/api/v1",
+  embeddingModel: "openai/text-embedding-3-small",
+});
+```
+
+Via MCP:
+
+```bash
+npx agent-memory mcp --project my-app \
+  --llm-api-key $OPENROUTER_API_KEY \
+  --llm-base-url https://openrouter.ai/api/v1 \
+  --llm-model openai/gpt-4.1-nano \
+  --embedding-api-key $OPENROUTER_API_KEY \
+  --embedding-base-url https://openrouter.ai/api/v1 \
+  --embedding-model openai/text-embedding-3-small
+```
+
+See [Vector Search](#openai-compatible-providers-1) for the embedding dimension requirement.
 
 ### Custom Prompts
 
@@ -516,6 +549,8 @@ Start the MCP server (see [MCP Server](#mcp-server) section).
 ```bash
 npx agent-memory mcp --project my-app
 npx agent-memory mcp --project my-app --llm-api-key $OPENAI_API_KEY  # enable ingest
+npx agent-memory mcp --project my-app --llm-api-key $OPENROUTER_API_KEY \
+  --llm-base-url https://openrouter.ai/api/v1  # OpenAI-compatible provider
 ```
 
 ### Hook Integration
@@ -564,8 +599,11 @@ Options:
 | `--read-only` | Disable write operations |
 | `--disable-tools <tools>` | Comma-separated tool names to disable |
 | `--embedding-api-key <key>` | Enable vector search |
+| `--embedding-model <model>` | Embedding model, must return 1536 dims (default: "text-embedding-3-small") |
+| `--embedding-base-url <url>` | OpenAI-compatible embeddings base URL (default: "https://api.openai.com/v1") |
 | `--llm-api-key <key>` | Enable intelligent ingest |
 | `--llm-model <model>` | LLM model for ingest (default: "gpt-4.1-nano") |
+| `--llm-base-url <url>` | OpenAI-compatible LLM base URL (default: "https://api.openai.com/v1") |
 
 ### MCP Tools (14 total)
 
@@ -769,6 +807,48 @@ Or via CLI/MCP:
 npx agent-memory mcp --project my-app --embedding-api-key $OPENAI_API_KEY
 ```
 
+### OpenAI-compatible providers
+
+`embeddingBaseUrl` accepts any OpenAI-compatible `/embeddings` endpoint (with or without a trailing slash). For example, with [OpenRouter](https://openrouter.ai):
+
+```typescript
+const memory = new AgentMemory(components.agentMemory, {
+  projectId: "my-app",
+  embeddingApiKey: process.env.OPENROUTER_API_KEY,
+  embeddingBaseUrl: "https://openrouter.ai/api/v1",
+  embeddingModel: "openai/text-embedding-3-small",
+});
+```
+
+Via MCP:
+
+```json
+{
+  "mcpServers": {
+    "agent-memory": {
+      "command": "npx",
+      "args": [
+        "agent-memory", "mcp",
+        "--project", "my-app",
+        "--embedding-api-key", "${env:OPENROUTER_API_KEY}",
+        "--embedding-base-url", "https://openrouter.ai/api/v1",
+        "--embedding-model", "openai/text-embedding-3-small"
+      ],
+      "env": {
+        "CONVEX_URL": "${env:CONVEX_URL}",
+        "OPENROUTER_API_KEY": "${env:OPENROUTER_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+**Requirements:**
+
+- **1536 dimensions.** The vector index is fixed at 1536 dimensions. Use a model that returns 1536-dim vectors (e.g. `text-embedding-3-small`, or `openai/text-embedding-3-small` on OpenRouter). Other sizes fail with a clear error.
+- **One model for documents and queries.** `semanticSearch` embeds the query with the same `embeddingModel` and `embeddingBaseUrl` used for stored memories. Vectors from different models aren't comparable.
+- **Changing the model requires re-embedding.** `embedAll` only embeds memories that have no embedding yet. After switching models, re-embed existing memories with `memory.embed(ctx, id)` (it overwrites the stored vector), then run `embedAll` for anything left.
+
 ### Backfilling Embeddings
 
 ```typescript
@@ -779,7 +859,7 @@ console.log(`Embedded ${result.embedded} memories, skipped ${result.skipped}`);
 
 ### Fallback Behavior
 
-If no embedding API key is provided, `semanticSearch` automatically falls back to full-text search. No errors, no configuration changes needed.
+If no embedding API key is provided, or the embeddings API request fails, `semanticSearch` falls back to full-text search. The exception is a dimension mismatch: that is a misconfiguration, so `semanticSearch` throws instead of hiding it behind a fallback.
 
 ---
 
